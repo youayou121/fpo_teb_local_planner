@@ -3,7 +3,7 @@ project(fpo_teb)
 
 # Set to Release in order to speed up the program significantly
 set(CMAKE_BUILD_TYPE Release) #None, Debug, Release, RelWithDebInfo, MinSizeRel
-
+find_package(OpenCV 4.2.0 REQUIRED)
 ## Find catkin macros and libraries
 find_package(catkin REQUIRED COMPONENTS
   base_local_planner
@@ -96,8 +96,8 @@ catkin_package(
 	roscpp
   mbf_costmap_core
 	std_msgs
-        tf2
-        tf2_ros
+  tf2
+  tf2_ros
 	visualization_msgs
   DEPENDS SUITESPARSE G2O
 )
@@ -108,6 +108,7 @@ include_directories(
   SYSTEM
   ${EXTERNAL_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
+  ${OpenCV2_INCLUDE_DIRS}
 )
 
 
@@ -130,6 +131,8 @@ add_dependencies(fpo_teb ${PROJECT_NAME}_generate_messages_cpp)
 target_link_libraries(fpo_teb
    ${EXTERNAL_LIBS}
    ${catkin_LIBRARIES}
+   ${OpenCV_LIBRARIES}
+   
 )
 
 add_executable(test_optim_node src/test_optim_node.cpp)
@@ -138,6 +141,7 @@ target_link_libraries(test_optim_node
    fpo_teb
    ${EXTERNAL_LIBS}
    ${catkin_LIBRARIES}
+   ${OpenCV_LIBRARIES}
 )
 
 
@@ -155,9 +159,9 @@ install(PROGRAMS
 install(TARGETS fpo_teb
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 )
-install(TARGETS test_optim_node
-   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
+# install(TARGETS test_optim_node
+#    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+# )
 
 install(DIRECTORY include/${PROJECT_NAME}/
    DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}

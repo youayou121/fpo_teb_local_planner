@@ -65,7 +65,9 @@ TebOptimalPlanner::TebOptimalPlanner() : cfg_(NULL), obstacles_(NULL), via_point
 }
   
 TebOptimalPlanner::TebOptimalPlanner(const TebConfig& cfg, ObstContainer* obstacles, RobotFootprintModelPtr robot_model, TebVisualizationPtr visual, const ViaPointContainer* via_points)
-{    
+{
+  ros::NodeHandle nh;
+  sub_obst = nh.subscribe("/obst_arr", 1, &TebOptimalPlanner::obstacle_arr_cb, this);
   initialize(cfg, obstacles, robot_model, visual, via_points);
 }
 
@@ -82,6 +84,39 @@ TebOptimalPlanner::~TebOptimalPlanner()
 void TebOptimalPlanner::updateRobotModel(RobotFootprintModelPtr robot_model)
 {
   robot_model_ = robot_model;
+}
+
+void TebOptimalPlanner::obstacle_arr_cb(const obstacle_prediction::ObstacleArray obst_arr)
+{
+  this->obst_arr = obst_arr;
+}
+
+Eigen::Vector2d TebOptimalPlanner::predict_future_pos(obstacle_prediction::Obstacle obst,float time)
+{
+  cv::KalmanFilter kf(6, 4, 0, CV_32F);
+  setIdentity(kf.measurementMatrix);
+  float sigmaP = 0.01;
+  float sigmaQ = 0.1;
+  setIdentity(kf.processNoiseCov, cv::Scalar::all(sigmaP));
+  setIdentity(kf.measurementNoiseCov, cv::Scalar(sigmaQ));
+  kf.statePost.at<float>(0) = obst.position.x;
+  kf.statePost.at<float>(1) = obst.position.y;
+  kf.statePost.at<float>(2) = obst.linear.x;
+  kf.statePost.at<float>(3) = obst.linear.y;
+  kf.statePost.at<float>(4) = 0;
+  kf.statePost.at<float>(5) = 0;
+  float dt = time;
+  kf.transitionMatrix = (cv::Mat_<float>(6, 6) << 1, 0, dt, 0, 0.5 * pow(dt, 2), 0,
+                          0, 1, 0, dt, 0, 0.5 * pow(dt, 2),
+                          0, 0, 1, 0, dt, 0,
+                          0, 0, 0, 1, 0, dt,
+                          0, 0, 0, 0, 1, 0,
+                          0, 0, 0, 0, 0, 1);
+  cv::Mat pred = kf.predict();
+  float x = pred.at<float>(0);
+  float y = pred.at<float>(1);
+  Eigen::Vector2d pos(x,y);
+  return pos;
 }
 
 void TebOptimalPlanner::initialize(const TebConfig& cfg, ObstContainer* obstacles, RobotFootprintModelPtr robot_model, TebVisualizationPtr visual, const ViaPointContainer* via_points)
@@ -109,7 +144,6 @@ void TebOptimalPlanner::initialize(const TebConfig& cfg, ObstContainer* obstacle
   initialized_ = true;
 }
 
-
 void TebOptimalPlanner::setVisualization(TebVisualizationPtr visualization)
 {
   visualization_ = visualization;
@@ -133,6 +167,7 @@ void TebOptimalPlanner::visualize()
 /*
  * registers custom vertices and edges in g2o framework
  */
+
 void TebOptimalPlanner::registerG2OTypes()
 {
   g2o::Factory* factory = g2o::Factory::instance();
@@ -182,7 +217,6 @@ boost::shared_ptr<g2o::SparseOptimizer> TebOptimalPlanner::initOptimizer()
   
   return optimizer;
 }
-
 
 bool TebOptimalPlanner::optimizeTEB(int iterations_innerloop, int iterations_outerloop, bool compute_cost_afterwards,
                                     double obst_cost_scale, double viapoint_cost_scale, bool alternative_time_cost)
@@ -644,7 +678,51 @@ void TebOptimalPlanner::AddEdgesObstaclesLegacy(double weight_multiplier)
 
 void TebOptimalPlanner::AddEdgesDynamicObstacles(double weight_multiplier)
 {
-   
+    bool inflated = cfg_->obstacles.inflation_dist > cfg_->obstacles.min_obstacle_dist;
+    Eigen::Matrix<double, 1, 1> information;
+    information.fill(cfg_->optim.weight_obstacle * weight_multiplier);
+    Eigen::Matrix<double, 2, 2> information_inflated;
+    information_inflated(0, 0) = cfg_->optim.weight_obstacle * weight_multiplier;
+    information_inflated(1, 1) = cfg_->optim.weight_inflation;
+    information_inflated(0, 1) = information_inflated(1, 0) = 0;
+
+    auto create_edge = [inflated, &information, &information_inflated, this](int index, const Obstacle *obstacle)
+    {
+      if (inflated)
+      {
+        EdgeInflatedObstacle *dist_bandpt_obst = new EdgeInflatedObstacle;
+        dist_bandpt_obst->setVertex(0, teb_.PoseVertex(index));
+        dist_bandpt_obst->setInformation(information_inflated);
+        dist_bandpt_obst->setParameters(*cfg_, robot_model_.get(), obstacle);
+        optimizer_->addEdge(dist_bandpt_obst);
+      }
+      else
+      {
+        EdgeObstacle *dist_bandpt_obst = new EdgeObstacle;
+        dist_bandpt_obst->setVertex(0, teb_.PoseVertex(index));
+        dist_bandpt_obst->setInformation(information);
+        dist_bandpt_obst->setParameters(*cfg_, robot_model_.get(), obstacle);
+        optimizer_->addEdge(dist_bandpt_obst);
+      };
+    };
+    auto iter_obstacle = obstacles_per_vertex_.begin();
+    float time_diff_sum = 0;
+    for (int i = 0; i < teb_.sizePoses()-1; i++)
+    {
+      time_diff_sum += teb_.TimeDiff(i);
+      float teb_x = teb_.Pose(i).x();
+      float teb_y = teb_.Pose(i).y();
+
+      for(auto obst_pos:this->obst_arr.obstacles)
+      {
+        Eigen::Vector2d obs = predict_future_pos(obst_pos,time_diff_sum);
+        ObstaclePtr obptr = ObstaclePtr(new PointObstacle(obs));
+        iter_obstacle->push_back(obptr);
+      }
+      for (const ObstaclePtr obst : *iter_obstacle)
+          create_edge(i, obst.get());
+      ++iter_obstacle;
+    }
 }
 
 void TebOptimalPlanner::AddEdgesViaPoints()

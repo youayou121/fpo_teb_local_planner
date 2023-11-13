@@ -67,7 +67,9 @@
 
 #include <nav_msgs/Odometry.h>
 #include <limits.h>
-
+#include <obstacle_prediction/Obstacle.h>
+#include <obstacle_prediction/ObstacleArray.h>
+#include <opencv2/video/video.hpp>
 namespace teb_local_planner
 {
 
@@ -676,7 +678,9 @@ protected:
    * @return shared pointer to the g2o::SparseOptimizer instance
    */
   boost::shared_ptr<g2o::SparseOptimizer> initOptimizer();
-    
+
+  void obstacle_arr_cb(const obstacle_prediction::ObstacleArray obst_arr);
+  Eigen::Vector2d predict_future_pos(obstacle_prediction::Obstacle obst,float time);
 
   // external objects (store weak pointers)
   const TebConfig* cfg_; //!< Config class that stores and manages all related parameters
@@ -697,7 +701,8 @@ protected:
 
   bool initialized_; //!< Keeps track about the correct initialization of this class
   bool optimized_; //!< This variable is \c true as long as the last optimization has been completed successful
-  
+  ros::Subscriber sub_obst;
+  obstacle_prediction::ObstacleArray obst_arr;
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW    
 };
