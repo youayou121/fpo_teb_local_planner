@@ -121,12 +121,12 @@ target_link_libraries(fpo_teb
 
 install(PROGRAMS
   scripts/cmd_vel_to_ackermann_drive.py
-  scripts/export_to_mat.py
-  scripts/export_to_svg.py
-  scripts/publish_dynamic_obstacle.py
-  scripts/publish_test_obstacles.py
-  scripts/publish_viapoints.py
-  scripts/visualize_velocity_profile.py
+  # scripts/export_to_mat.py
+  # scripts/export_to_svg.py
+  # scripts/publish_dynamic_obstacle.py
+  # scripts/publish_test_obstacles.py
+  # scripts/publish_viapoints.py
+  # scripts/visualize_velocity_profile.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
