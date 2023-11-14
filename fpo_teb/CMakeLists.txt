@@ -27,6 +27,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_ros
   visualization_msgs
   teb_local_planner
+  obstacle_prediction
 )
 message(STATUS "System: ${CMAKE_SYSTEM}")
 
@@ -100,6 +101,7 @@ add_library(fpo_teb
    src/timed_elastic_band.cpp
    src/optimal_planner.cpp
    src/obstacles.cpp
+   src/teb_config.cpp
    src/visualization.cpp
    src/recovery_behaviors.cpp
    src/homotopy_class_planner.cpp
