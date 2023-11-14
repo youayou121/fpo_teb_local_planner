@@ -21,7 +21,7 @@
   <author email="christoph.roesmann@tu-dortmund.de">Christoph Rösmann</author>
 
   <buildtool_depend>catkin</buildtool_depend>
-
+  <build_depend>teb_local_planner</build_depend>
   <build_depend>cmake_modules</build_depend>
   <build_depend>message_generation</build_depend>
   <build_depend>tf2_eigen</build_depend>
@@ -29,6 +29,7 @@
   
   <build_export_depend>message_runtime</build_export_depend>
   <exec_depend>message_runtime</exec_depend>
+  <exec_depend>teb_local_planner</exec_depend>
   
   <depend>base_local_planner</depend>
   <depend>costmap_2d</depend>

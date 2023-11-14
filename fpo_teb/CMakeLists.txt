@@ -26,6 +26,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_geometry_msgs
   tf2_ros
   visualization_msgs
+  teb_local_planner
 )
 message(STATUS "System: ${CMAKE_SYSTEM}")
 
@@ -61,23 +62,6 @@ else()
   by linked third party packages starting from ROS Jade. Ignore this message for ROS Indigo.")
 endif()
 endif()
-
-add_message_files(
-  FILES
-  TrajectoryPointMsg.msg
-  TrajectoryMsg.msg
-  FeedbackMsg.msg
-)
-
-
-generate_messages(
-   DEPENDENCIES
-   geometry_msgs std_msgs costmap_converter
-)
-
-generate_dynamic_reconfigure_options(
-  cfg/TebLocalPlannerReconfigure.cfg
-)
 
 catkin_package(
   INCLUDE_DIRS include ${EXTERNAL_INCLUDE_DIRS}
@@ -118,7 +102,6 @@ add_library(fpo_teb
    src/obstacles.cpp
    src/visualization.cpp
    src/recovery_behaviors.cpp
-   src/teb_config.cpp
    src/homotopy_class_planner.cpp
    src/teb_local_planner_ros.cpp
    src/graph_search.cpp
@@ -133,15 +116,6 @@ target_link_libraries(fpo_teb
    ${catkin_LIBRARIES}
    ${OpenCV_LIBRARIES}
    
-)
-
-add_executable(test_optim_node src/test_optim_node.cpp)
-
-target_link_libraries(test_optim_node
-   fpo_teb
-   ${EXTERNAL_LIBS}
-   ${catkin_LIBRARIES}
-   ${OpenCV_LIBRARIES}
 )
 
 
@@ -159,9 +133,6 @@ install(PROGRAMS
 install(TARGETS fpo_teb
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 )
-# install(TARGETS test_optim_node
-#    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
 
 install(DIRECTORY include/${PROJECT_NAME}/
    DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
@@ -181,10 +152,3 @@ install(DIRECTORY
   PATTERN ".svn" EXCLUDE
 )
 
-
-if (CATKIN_ENABLE_TESTING)
-  catkin_add_gtest(test_teb_basics test/teb_basics.cpp)
-  if(TARGET test_teb_basics)
-     target_link_libraries(test_teb_basics fpo_teb)
-  endif()
-endif()
