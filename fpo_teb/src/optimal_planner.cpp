@@ -327,7 +327,7 @@ namespace teb_local_planner
       PoseSE2 start_(initial_plan.front().pose);
       PoseSE2 goal_(initial_plan.back().pose);
       if (teb_.sizePoses() > 0 && (goal_.position() - teb_.BackPose().position()).norm() < cfg_->trajectory.force_reinit_new_goal_dist && fabs(g2o::normalize_theta(goal_.theta() - teb_.BackPose().theta())) < cfg_->trajectory.force_reinit_new_goal_angular) // actual warm start!
-        teb_.updateAndPruneTEB(start_, goal_, cfg_->trajectory.min_samples);                                                                                                                                                                                    // update TEB
+          teb_.updateAndPruneTEB(start_, goal_, cfg_->trajectory.min_samples);                                                                                                                                                                                    // update TEB
       else                                                                                                                                                                                                                                                      // goal too far away -> reinit
       {
         ROS_DEBUG("New goal: distance to existing goal is higher than the specified threshold. Reinitalizing trajectories.");
@@ -335,6 +335,19 @@ namespace teb_local_planner
         teb_.initTrajectoryToGoal(initial_plan, cfg_->robot.max_vel_x, cfg_->robot.max_vel_theta, cfg_->trajectory.global_plan_overwrite_orientation,
                                   cfg_->trajectory.min_samples, cfg_->trajectory.allow_init_with_backwards_motion);
       }
+      // if ((teb_.Pose(0).position() - teb_.BackPose().position()).norm() > 1)
+      // {
+      //   ROS_DEBUG("New goal: distance to existing goal is higher than the specified threshold. Reinitalizing trajectories.");
+      //   // std::cout << "clear" << std::endl;
+      //   teb_.clearTimedElasticBand();
+      //   teb_.initTrajectoryToGoal(initial_plan, cfg_->robot.max_vel_x, cfg_->robot.max_vel_theta, cfg_->trajectory.global_plan_overwrite_orientation,
+      //                             cfg_->trajectory.min_samples, cfg_->trajectory.allow_init_with_backwards_motion);
+      // }
+      // else
+      // {
+      //   teb_.updateAndPruneTEB(start_, goal_, cfg_->trajectory.min_samples);
+      //   // std::cout << "update" << std::endl;
+      // }
     }
     if (start_vel)
       setVelocityStart(*start_vel);
@@ -736,7 +749,7 @@ namespace teb_local_planner
     float time_diff_sum = 0;
     if (this->global_costmap.data.size() > 0)
     {
-      for (int i = 0; i < teb_.sizePoses() - 1; i++)
+      for (int i = 1; i < teb_.sizePoses() - 1; i++)
       {
         // 添加静态障碍物
         for (const ObstaclePtr &obst : *obstacles_)
@@ -745,7 +758,6 @@ namespace teb_local_planner
           // force considering obstacle if really close to the current pose
           float x = obst->getCentroid().x();
           float y = obst->getCentroid().y();
-          ;
           int mx = (x - this->global_costmap.info.origin.position.x) / this->global_costmap.info.resolution;
           int my = (y - this->global_costmap.info.origin.position.y) / this->global_costmap.info.resolution;
           int index = my * this->global_costmap.info.width + mx;
@@ -769,31 +781,6 @@ namespace teb_local_planner
           float length = obst_pos.length;
           float w = obs.y() - width / 2;
           float l = obs.x() - length / 2;
-          float obst_yaw = atan2(obst_pos.linear.y,obst_pos.linear.x);
-          float pose_yaw = atan2(pose_orient.y(),pose_orient.x());
-          bool left_flag;
-          if(pose_yaw>0)
-          {
-            if(obst_yaw>pose_yaw||obst_yaw<-3.1415926+pose_yaw)
-            {
-              left_flag = true;
-            }
-            else
-            {
-              left_flag = false;
-            }
-          }else
-          {
-            if(obst_yaw<pose_yaw||obst_yaw>3.1415926-pose_yaw)
-            {
-              left_flag = true;
-            }
-            else
-            {
-              left_flag = false;
-            }
-          }
-          std::cout<<pose_yaw<<std::endl;
           for (; l < obs.x() + length / 2; l = l + reso)
           {
             for (; w < obs.y() + width / 2; w = w + reso)
@@ -801,25 +788,22 @@ namespace teb_local_planner
               Eigen::Vector2d obstacle(l, w);
               ObstaclePtr obptr = ObstaclePtr(new PointObstacle(obstacle));
               float dist = robot_model_->calculateDistance(teb_.Pose(i), obptr.get());
-              if (cross2d(pose_orient, obptr->getCentroid()) > 0&&left_flag) // left
+              if (dist < cfg_->obstacles.min_obstacle_dist * cfg_->obstacles.obstacle_association_force_inclusion_factor)
               {
-                if (dist < cfg_->obstacles.min_obstacle_dist * cfg_->obstacles.obstacle_association_force_inclusion_factor)
-                {
-                  iter_obstacle->push_back(obptr);
-                }
+                iter_obstacle->push_back(obptr);
               }
-              else if(!cross2d(pose_orient, obptr->getCentroid()) > 0&&!left_flag)//right
-              {
-                if (dist < cfg_->obstacles.min_obstacle_dist * cfg_->obstacles.obstacle_association_force_inclusion_factor)
-                {
-                  iter_obstacle->push_back(obptr);
-                }
-              } 
             }
           }
         }
+        
         for (const ObstaclePtr obst : *iter_obstacle)
-          create_edge(i, obst.get());
+        {
+          // float dist = robot_model_->calculateDistance(teb_.Pose(i), obst.get());
+          // if (dist < cfg_->obstacles.min_obstacle_dist * cfg_->obstacles.obstacle_association_force_inclusion_factor)
+          // {
+            create_edge(i, obst.get());
+          // }
+        }
         ++iter_obstacle;
       }
     }
